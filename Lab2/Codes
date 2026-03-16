@@ -1,0 +1,953 @@
+module multifunction_register_8 (
+    input  logic clk,
+    input  logic reset, // synchronous
+    input  logic [2:0]  s,
+    input  logic shift_in,   // serial input
+    input  logic [7:0]  D, // parallel load input
+    output logic [7:0]  Q // register contents
+);
+    logic [7:0] d_next;
+    genvar i;
+    generate
+        for (i = 0; i < 8; i++) begin : bit_logic
+            logic [7:0] I; 
+
+            always_comb begin
+
+                I[0] = Q[i]; //hold
+
+                if (i == 7) // shift left
+                    I[1] = Q[6];
+                else if (i > 0)
+                    I[1] = Q[i-1];
+                else
+                    I[1] = shift_in; // i == 0
+
+                if (i == 7) // shift right
+                    I[2] = shift_in;
+                else
+                    I[2] = Q[i+1];
+
+                I[3] = D[i]; // parallel load
+                if (i == 0)  // rotate left
+                    I[4] = Q[7];
+                else
+                    I[4] = Q[i-1];
+
+                if (i == 7) // rotate right
+                    I[5] = Q[0]; 
+                else
+                    I[5] = Q[i+1];
+
+                I[6] = 1'b0;// kullanılmıyo
+                I[7] = 1'b0;// kullanılmıyo
+            end
+
+            // her bite 1 mux 
+            mux8_1 u_mux (
+                .I   (I),
+                .sel (s),
+                .y   (d_next[i])
+            );
+  dff_sync_reset dff_i (
+            .clk   (clk),
+            .reset (reset),
+            .d     (d_next[i]),
+            .q     (Q[i])
+        );
+        end
+    endgenerate
+endmodule
+
+module mux8_1 (
+    input  logic [7:0] I,
+    input  logic [2:0] sel,
+    output logic       y
+);
+    always_comb begin
+        unique case (sel)
+            3'b000: y = I[0]; //hold
+            3'b001: y = I[1]; //shift left
+            3'b010: y = I[2]; //shift right
+            3'b011: y = I[3]; //load
+            3'b100: y = I[4]; //rotate left
+            3'b101: y = I[5]; //rotate right
+            default: y = 1'b0; // I6 ve I7 kullanılmıyo (0)
+        endcase
+    end
+endmodule
+
+
+module dff_sync_reset #(
+    parameter WIDTH = 1
+)(
+    input  logic clk,
+    input  logic reset, 
+    input  logic [WIDTH-1:0] d,
+    output logic [WIDTH-1:0] q
+);
+    always_ff @(posedge clk) begin
+        if (reset)
+            q <= '0;
+        else
+            q <= d;
+    end
+endmodule
+
+`timescale 1ns / 1ps
+module top_multifunction_reg (
+    input  logic        clk,       
+    input  logic        btnC,    
+    input  logic [15:0] sw,       
+    output logic [15:0] led        
+);
+
+
+    logic slow_clk;
+
+    clock_divider u_div (
+        .clk_in (clk),
+        .reset  (btnC),    
+        .clk_2hz(slow_clk)
+    );
+
+
+    logic        reset;
+    logic [2:0]  s;
+    logic        shift_in;
+    logic [7:0]  D;
+    logic [7:0]  Q;
+
+    assign reset    = btnC;        
+    assign s        = sw[2:0];     
+    assign shift_in = sw[3];     
+    assign D        = sw[11:4];   
+
+
+    assign led[7:0]  = Q;
+    assign led[15:8] = 8'b0;
+
+
+    multifunction_register_8 dut (
+        .clk      (slow_clk),   
+        .reset    (reset),
+        .s        (s),
+        .shift_in (shift_in),
+        .D        (D),
+        .Q        (Q)
+    );
+endmodule
+
+
+## Clock
+set_property -dict { PACKAGE_PIN W5   IOSTANDARD LVCMOS33 } [get_ports clk]
+create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk]
+
+## Reset button
+set_property -dict { PACKAGE_PIN U18  IOSTANDARD LVCMOS33 } [get_ports btnC]
+
+## Switches
+set_property -dict { PACKAGE_PIN V17  IOSTANDARD LVCMOS33 } [get_ports {sw[0]}]
+set_property -dict { PACKAGE_PIN V16  IOSTANDARD LVCMOS33 } [get_ports {sw[1]}]
+set_property -dict { PACKAGE_PIN W16  IOSTANDARD LVCMOS33 } [get_ports {sw[2]}]
+set_property -dict { PACKAGE_PIN W17  IOSTANDARD LVCMOS33 } [get_ports {sw[3]}]
+set_property -dict { PACKAGE_PIN W15  IOSTANDARD LVCMOS33 } [get_ports {sw[4]}]
+set_property -dict { PACKAGE_PIN V15  IOSTANDARD LVCMOS33 } [get_ports {sw[5]}]
+set_property -dict { PACKAGE_PIN W14  IOSTANDARD LVCMOS33 } [get_ports {sw[6]}]
+set_property -dict { PACKAGE_PIN W13  IOSTANDARD LVCMOS33 } [get_ports {sw[7]}]
+set_property -dict { PACKAGE_PIN V2   IOSTANDARD LVCMOS33 } [get_ports {sw[8]}]
+set_property -dict { PACKAGE_PIN T3   IOSTANDARD LVCMOS33 } [get_ports {sw[9]}]
+set_property -dict { PACKAGE_PIN T2   IOSTANDARD LVCMOS33 } [get_ports {sw[10]}]
+set_property -dict { PACKAGE_PIN R3   IOSTANDARD LVCMOS33 } [get_ports {sw[11]}]
+set_property -dict { PACKAGE_PIN W2   IOSTANDARD LVCMOS33 } [get_ports {sw[12]}]
+set_property -dict { PACKAGE_PIN U1   IOSTANDARD LVCMOS33 } [get_ports {sw[13]}]
+set_property -dict { PACKAGE_PIN T1   IOSTANDARD LVCMOS33 } [get_ports {sw[14]}]
+set_property -dict { PACKAGE_PIN R2   IOSTANDARD LVCMOS33 } [get_ports {sw[15]}]
+
+## LEDs
+set_property -dict { PACKAGE_PIN U16  IOSTANDARD LVCMOS33 } [get_ports {led[0]}]
+set_property -dict { PACKAGE_PIN E19  IOSTANDARD LVCMOS33 } [get_ports {led[1]}]
+set_property -dict { PACKAGE_PIN U19  IOSTANDARD LVCMOS33 } [get_ports {led[2]}]
+set_property -dict { PACKAGE_PIN V19  IOSTANDARD LVCMOS33 } [get_ports {led[3]}]
+set_property -dict { PACKAGE_PIN W18  IOSTANDARD LVCMOS33 } [get_ports {led[4]}]
+set_property -dict { PACKAGE_PIN U15  IOSTANDARD LVCMOS33 } [get_ports {led[5]}]
+set_property -dict { PACKAGE_PIN U14  IOSTANDARD LVCMOS33 } [get_ports {led[6]}]
+set_property -dict { PACKAGE_PIN V14  IOSTANDARD LVCMOS33 } [get_ports {led[7]}]
+set_property -dict { PACKAGE_PIN V13  IOSTANDARD LVCMOS33 } [get_ports {led[8]}]
+set_property -dict { PACKAGE_PIN V3   IOSTANDARD LVCMOS33 } [get_ports {led[9]}]
+set_property -dict { PACKAGE_PIN W3   IOSTANDARD LVCMOS33 } [get_ports {led[10]}]
+set_property -dict { PACKAGE_PIN U3   IOSTANDARD LVCMOS33 } [get_ports {led[11]}]
+set_property -dict { PACKAGE_PIN P3   IOSTANDARD LVCMOS33 } [get_ports {led[12]}]
+set_property -dict { PACKAGE_PIN N3   IOSTANDARD LVCMOS33 } [get_ports {led[13]}]
+set_property -dict { PACKAGE_PIN P1   IOSTANDARD LVCMOS33 } [get_ports {led[14]}]
+set_property -dict { PACKAGE_PIN L1   IOSTANDARD LVCMOS33 } [get_ports {led[15]}]
+
+module tb_top_multifunction_reg;
+    logic        clk;
+    logic        btnC;
+    logic [15:0] sw;
+    logic [15:0] led;
+    top_multifunction_reg dut (
+        .clk  (clk),
+        .btnC (btnC),
+        .sw   (sw),
+        .led  (led)
+    );
+
+    initial clk = 0;
+    always #5 clk = ~clk;
+
+    initial begin
+        btnC = 1'b1;  
+        sw   = '0;
+
+        #20;
+        btnC = 1'b0;   
+        
+        sw[2:0]  = 3'b011;  // s
+        sw[3]    = 1'b0;    // shift_in
+        sw[11:4] = 8'hA5;   // D
+        #10;
+
+        // hold
+        sw[2:0] = 3'b000;
+        #20;
+
+        // shift left ve shift_in açık
+        sw[3]   = 1'b1;
+        sw[2:0] = 3'b001;
+        #40;
+
+        // shift right ve shift_in kapalı
+        sw[3]   = 1'b0;
+        sw[2:0] = 3'b010;
+        #40;
+
+        // rotate left
+        sw[2:0] = 3'b100;
+        #40;
+
+        // rotate right
+        sw[2:0] = 3'b101;
+        #40;
+
+        $stop;
+    end
+endmodule
+
+module tb_multifunction_register_8;
+
+    logic        clk;
+    logic        reset;
+    logic [2:0]  s;
+    logic        shift_in;
+    logic [7:0]  D;
+    logic [7:0]  Q;
+
+    multifunction_register_8 dut (
+        .clk      (clk),
+        .reset    (reset),
+        .s        (s),
+        .shift_in (shift_in),
+        .D        (D),
+        .Q        (Q)
+    );
+
+    initial clk = 0;
+    always #5 clk = ~clk;
+
+    initial begin
+        reset    = 1'b1;
+        s        = 3'b000;
+        shift_in = 1'b0;
+        D        = 8'h00;
+
+        #20;
+        reset = 1'b0;
+
+        D = 8'hA5;
+        s = 3'b011;  // load
+        #10;         // one clock edge
+        s = 3'b000;  // hold
+        #10;
+
+        shift_in = 1'b1;
+        s = 3'b001;  // shift left
+        #20;
+
+        shift_in = 1'b0;
+        s = 3'b010;  // shift right
+        #20;
+
+        // rotate left twice
+        s = 3'b100;
+        #20;
+
+        // rotate right twice
+        s = 3'b101;
+        #20;
+
+        // son hold
+        s = 3'b000;
+        #20;
+
+        $stop;
+    end
+endmodule
+
+
+module sevenseg_multi (
+    input  logic        clk,
+    input  logic        reset,   
+    input  logic [15:0] w,     
+    output logic        a,
+    output logic        b,
+    output logic        c,
+    output logic        d,
+    output logic        e,
+    output logic        f,
+    output logic        g,
+    output logic [3:0]  an      
+);
+
+    logic [15:0] refresh_counter;
+    logic [1:0]  digit_index;       
+    logic [3:0]  current_nibble;    
+    always_ff @(posedge clk) begin
+        if (reset)
+            refresh_counter <= '0;
+        else
+            refresh_counter <= refresh_counter + 1'b1;
+    end
+
+    assign digit_index = refresh_counter[15:14];
+
+    always_comb begin
+        current_nibble = 4'h0;
+        an             = 4'b1111; 
+
+        unique case (digit_index)
+            2'b00: begin
+                // en sag digit
+                current_nibble = w[3:0];
+                an             = 4'b1110; // AN0 
+            end
+            2'b01: begin
+                current_nibble = w[7:4];
+                an             = 4'b1101; // AN1 
+            end
+            2'b10: begin
+                current_nibble = w[11:8];
+                an             = 4'b1011; // AN2
+            end
+            2'b11: begin
+                // en soldaki digit
+                current_nibble = w[15:12];
+                an             = 4'b0111; // AN3 
+            end
+        endcase
+    end
+
+    hex_to_7seg u_hex (
+        .w (current_nibble),
+        .a (a),
+        .b (b),
+        .c (c),
+        .d (d),
+        .e (e),
+        .f (f),
+        .g (g)
+    );
+
+
+module hex_to_7seg (
+    input  logic [3:0] w,
+    output logic       a,
+    output logic       b,
+    output logic       c,
+    output logic       d,
+    output logic       e,
+    output logic       f,
+    output logic       g
+);
+
+    logic [6:0] seg; 
+
+    always_comb begin
+        unique case (w)
+            4'h0: seg = 7'b0000001; // 0
+            4'h1: seg = 7'b1001111; // 1
+            4'h2: seg = 7'b0010010; // 2
+            4'h3: seg = 7'b0000110; // 3
+            4'h4: seg = 7'b1001100; // 4
+            4'h5: seg = 7'b0100100; // 5
+            4'h6: seg = 7'b0100000; // 6
+            4'h7: seg = 7'b0001111; // 7
+            4'h8: seg = 7'b0000000; // 8
+            4'h9: seg = 7'b0000100; // 9
+            4'hA: seg = 7'b0001000; // A
+            4'hB: seg = 7'b1100000; // b
+            4'hC: seg = 7'b0110001; // C
+            4'hD: seg = 7'b1000010; // d
+            4'hE: seg = 7'b0110000; // E
+            4'hF: seg = 7'b0111000; // F
+            default: seg = 7'b1111111; // gecersiz
+        endcase
+    end
+
+    assign {a,b,c,d,e,f,g} = seg;
+endmodule
+
+
+set_property PACKAGE_PIN W5 [get_ports {clk}]
+set_property IOSTANDARD LVCMOS33 [get_ports {clk}]
+set_property PACKAGE_PIN U18 [get_ports {reset}]
+set_property IOSTANDARD LVCMOS33 [get_ports {reset}]
+set_property PACKAGE_PIN V17 [get_ports {w[0]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[0]}]
+set_property PACKAGE_PIN V16 [get_ports {w[1]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[1]}]
+set_property PACKAGE_PIN W16 [get_ports {w[2]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[2]}]
+set_property PACKAGE_PIN W17 [get_ports {w[3]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[3]}]
+set_property PACKAGE_PIN W15 [get_ports {w[4]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[4]}]
+set_property PACKAGE_PIN V15 [get_ports {w[5]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[5]}]
+set_property PACKAGE_PIN W14 [get_ports {w[6]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[6]}]
+set_property PACKAGE_PIN W13 [get_ports {w[7]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[7]}]
+set_property PACKAGE_PIN V2  [get_ports {w[8]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[8]}]
+set_property PACKAGE_PIN T3  [get_ports {w[9]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[9]}]
+set_property PACKAGE_PIN T2  [get_ports {w[10]}]  ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[10]}]
+set_property PACKAGE_PIN R3  [get_ports {w[11]}]  ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[11]}]
+set_property PACKAGE_PIN W2  [get_ports {w[12]}]  ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[12]}]
+set_property PACKAGE_PIN U1  [get_ports {w[13]}]  ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[13]}]
+set_property PACKAGE_PIN T1  [get_ports {w[14]}]  ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[14]}]
+set_property PACKAGE_PIN R2  [get_ports {w[15]}]  ;
+set_property IOSTANDARD LVCMOS33 [get_ports {w[15]}]
+set_property PACKAGE_PIN W7 [get_ports {a}]
+set_property IOSTANDARD LVCMOS33 [get_ports {a}]
+set_property PACKAGE_PIN W6 [get_ports {b}]
+set_property IOSTANDARD LVCMOS33 [get_ports {b}]
+set_property PACKAGE_PIN U8 [get_ports {c}]
+set_property IOSTANDARD LVCMOS33 [get_ports {c}]
+set_property PACKAGE_PIN V8 [get_ports {d}]
+set_property IOSTANDARD LVCMOS33 [get_ports {d}]
+set_property PACKAGE_PIN U5 [get_ports {e}]
+set_property IOSTANDARD LVCMOS33 [get_ports {e}]
+set_property PACKAGE_PIN V5 [get_ports {f}]
+set_property IOSTANDARD LVCMOS33 [get_ports {f}]
+set_property PACKAGE_PIN U7 [get_ports {g}]
+set_property IOSTANDARD LVCMOS33 [get_ports {g}]
+set_property PACKAGE_PIN U2 [get_ports {an[0]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {an[0]}]
+set_property PACKAGE_PIN U4 [get_ports {an[1]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {an[1]}]
+set_property PACKAGE_PIN V4 [get_ports {an[2]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {an[2]}]
+set_property PACKAGE_PIN W4 [get_ports {an[3]}]   ;
+set_property IOSTANDARD LVCMOS33 [get_ports {an[3]}]
+
+module tb_sevenseg_multi;
+    logic        clk;
+    logic        reset;
+    logic [15:0] w;
+    logic        a, b, c, d, e, f, g;
+    logic [3:0]  an;
+
+    sevenseg_multi dut (
+        .clk (clk),
+        .reset (reset),
+        .w   (w),
+        .a   (a),
+        .b   (b),
+        .c   (c),
+        .d   (d),
+        .e   (e),
+        .f   (f),
+        .g   (g),
+        .an  (an)
+    );
+
+    initial clk = 0;
+    always #5 clk = ~clk;
+
+    initial begin
+        reset = 1'b1;
+        w     = 16'h1234;
+
+        #20;
+        reset = 1'b0;
+
+        #1000;
+
+        w = 16'hABCD;
+        #1000;
+
+        w = 16'h0F0F;
+        #1000;
+
+        $stop;
+    end
+endmodule
+
+module lab3_top (
+    input  logic        clk,    
+    input  logic [15:0] sw,
+    output logic [15:0] led,
+    output logic [6:0]  seg,
+    output logic [3:0]  an
+);
+
+    logic        reset_sw;
+    logic [2:0]  s;
+    logic [11:0] load_value;
+
+    assign s          = sw[15:13];
+    assign reset_sw   = sw[12];
+    assign load_value = sw[11:0];
+
+    logic clk_2Hz;
+    logic clk_1kHz;
+
+  clock_divider u_clk_div (
+    .clk      (clk),
+    .clk_2Hz  (clk_2Hz),
+    .clk_1kHz (clk_1kHz)
+);
+
+    logic [15:0] count;
+
+    lab_counter_16 u_lab_counter_16 (
+        .clk        (clk_2Hz),     
+        .reset      (reset_sw),
+        .s          (s),
+        .load_value (load_value),
+        .count      (count)
+    );
+
+    sevenseg_driver_4digit u_sevenseg_driver (
+        .clk   (clk_1kHz),        
+        .reset (reset_sw),
+        .value (count),
+        .seg   (seg),
+        .an    (an)
+    );
+    
+    localparam logic [15:0] ALARM_VALUE = 16'h0BE6;
+
+    logic alarm_active;
+    logic alarm_flash;
+
+    assign alarm_active = (count >= ALARM_VALUE);
+
+    always_ff @(posedge clk_2Hz) begin
+        if (reset_sw)
+            alarm_flash <= 1'b0;
+        else if (alarm_active)
+            alarm_flash <= ~alarm_flash;
+        else
+            alarm_flash <= 1'b0;
+    end
+
+    always_comb begin
+        led[7:0]  = count[7:0]; 
+        if (alarm_active)
+            led[15:8] = {8{alarm_flash}};
+        else
+            led[15:8] = count[15:8];     
+    end
+endmodule
+
+module clock_divider (
+    input  logic clk,   
+    input  logic reset,
+    output logic clk_2Hz,
+    output logic clk_1kHz
+);
+    localparam int N_2HZ  = 25_000_000;
+    localparam int N_1KHZ = 50_000;
+
+    logic [25:0] cnt_2Hz;     
+    logic [15:0] cnt_1kHz;   
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            cnt_2Hz  <= '0;
+            clk_2Hz  <= 1'b0;
+        end
+        else begin
+            if (cnt_2Hz == N_2HZ-1) begin
+                cnt_2Hz <= '0;
+                clk_2Hz <= ~clk_2Hz;
+            end
+            else begin
+                cnt_2Hz <= cnt_2Hz + 1'b1;
+            end
+        end
+    end
+
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            cnt_1kHz  <= '0;
+            clk_1kHz  <= 1'b0;
+        end
+        else begin
+            if (cnt_1kHz == N_1KHZ-1) begin
+                cnt_1kHz <= '0;
+                clk_1kHz <= ~clk_1kHz;
+            end
+            else begin
+                cnt_1kHz <= cnt_1kHz + 1'b1;
+            end
+        end
+    end
+endmodule
+
+module multifunction_register_8 (
+    input  logic        clk,
+    input  logic        reset,      // synchronous
+    input  logic [2:0]  s,
+    input  logic        shift_in,   // serial input
+    input  logic [7:0]  D,          // parallel load input
+    output logic [7:0]  Q           // register contents
+);
+    logic [7:0] d_next;
+
+    genvar i;
+    generate
+        for (i = 0; i < 8; i++) begin : bit_logic
+            logic [7:0] I; 
+            always_comb begin
+                // I[0] = hold (keep same bit)
+                I[0] = Q[i];
+
+                // shift left
+                if (i == 7)
+                    I[1] = Q[6];
+                else if (i > 0)
+                    I[1] = Q[i-1];
+                else
+                    I[1] = shift_in; // i == 0
+
+                // shift right
+                if (i == 7)
+                    I[2] = shift_in;
+                else
+                    I[2] = Q[i+1];
+
+                // parallel load
+                I[3] = D[i];
+
+                // rotate left
+                if (i == 0)
+                    I[4] = Q[7];
+                else
+                    I[4] = Q[i-1];
+
+                // rotate right
+                if (i == 7)
+                    I[5] = Q[0];
+                else
+                    I[5] = Q[i+1];
+
+                // unused
+                I[6] = 1'b0;
+                I[7] = 1'b0;
+            end
+
+            // one mux per bit
+            mux8_1 u_mux (
+                .I   (I),
+                .sel (s),
+                .y   (d_next[i])
+            );
+
+            dff_sync_reset dff_i (
+                .clk   (clk),
+                .reset (reset),
+                .d     (d_next[i]),
+                .q     (Q[i])
+            );
+        end
+    endgenerate
+endmodule
+
+module lab_counter_16 (
+    input  logic        clk,         
+    input  logic        reset,
+    input  logic [2:0]  s,           
+    input  logic [11:0] load_value,  
+    output logic [15:0] count        
+);
+    logic [7:0] Q_low,  Q_high;
+    logic [7:0] D_low,  D_high;
+    logic       shift_in_low;
+    logic       shift_in_high;
+
+    assign D_low  = load_value[7:0];
+    assign D_high = {4'b0000, load_value[11:8]};
+
+    always_comb begin
+
+        shift_in_low  = 1'b0;
+        shift_in_high = 1'b0;
+
+        unique case (s)
+            3'b001: begin // shift left
+                shift_in_low  = 1'b0;   
+                shift_in_high = Q_low[7];  
+            end
+            3'b010: begin // shift right
+                shift_in_low  = Q_high[0]; 
+                shift_in_high = 1'b0;     
+            end
+            default: begin
+                // hold, parallel load, rotate
+                shift_in_low  = 1'b0;
+                shift_in_high = 1'b0;
+            end
+        endcase
+    end
+
+    multifunction_register_8 reg_low (
+        .clk      (clk),
+        .reset    (reset),
+        .s        (s),
+        .shift_in (shift_in_low),
+        .D        (D_low),
+        .Q        (Q_low)
+    );
+
+    multifunction_register_8 reg_high (
+        .clk      (clk),
+        .reset    (reset),
+        .s        (s),
+        .shift_in (shift_in_high),
+        .D        (D_high),
+        .Q        (Q_high)
+    );
+
+    assign count = {Q_high, Q_low};
+endmodule
+
+module hex_to_7seg (
+    input  logic [3:0] w,
+    output logic       a,
+    output logic       b,
+    output logic       c,
+    output logic       d,
+    output logic       e,
+    output logic       f,
+    output logic       g
+);
+    // {a,b,c,d,e,f,g}
+    logic [6:0] seg;
+
+    always_comb begin
+        unique case (w)
+            4'h0: seg = 7'b0000001; // 0
+            4'h1: seg = 7'b1001111; // 1
+            4'h2: seg = 7'b0010010; // 2
+            4'h3: seg = 7'b0000110; // 3
+            4'h4: seg = 7'b1001100; // 4
+            4'h5: seg = 7'b0100100; // 5
+            4'h6: seg = 7'b0100000; // 6
+            4'h7: seg = 7'b0001111; // 7
+            4'h8: seg = 7'b0000000; // 8
+            4'h9: seg = 7'b0000100; // 9
+            4'hA: seg = 7'b0001000; // A
+            4'hB: seg = 7'b1100000; // b
+            4'hC: seg = 7'b0110001; // C
+            4'hD: seg = 7'b1000010; // d
+            4'hE: seg = 7'b0110000; // E
+            4'hF: seg = 7'b0111000; // F
+            default: seg = 7'b1111111; // all off (invalid)
+        endcase
+    end
+
+    assign {a,b,c,d,e,f,g} = seg;
+
+
+module mux8_1 (
+    input  logic [7:0] I,
+    input  logic [2:0] sel,
+    output logic       y
+);
+    always_comb begin
+        unique case (sel)
+            3'b000: y = I[0]; // hold
+            3'b001: y = I[1]; // shift left
+            3'b010: y = I[2]; // shift right
+            3'b011: y = I[3]; // parallel load
+            3'b100: y = I[4]; // rotate left
+            3'b101: y = I[5]; // rotate right
+            default: y = 1'b0; // I6 and I7 unused (0)
+        endcase
+    end
+endmodule
+
+
+module dff_sync_reset #(
+    parameter WIDTH = 1
+)(
+    input  logic                 clk,
+    input  logic                 reset, 
+    input  logic [WIDTH-1:0]     d,
+    output logic [WIDTH-1:0]     q
+);
+    always_ff @(posedge clk) begin
+        if (reset)
+            q <= '0;
+        else
+            q <= d;
+    end
+endmodule
+
+module tb_lab_counter_16;
+    logic        clk;
+    logic        reset;
+    logic [2:0]  s;
+    logic [11:0] load_value;
+    logic [15:0] count;
+
+    lab_counter_16 dut (
+        .clk        (clk),
+        .reset      (reset),
+        .s          (s),
+        .load_value (load_value),
+        .count      (count)
+    );
+
+    initial clk = 1'b0;
+    always #5 clk = ~clk;
+
+    initial begin
+
+        reset      = 1'b1;
+        s          = 3'b000;      // hold
+        load_value = 12'h014;     
+
+        #20;
+        reset = 1'b0;
+
+        s = 3'b011;
+        #10;
+
+        // hold
+        s = 3'b000;
+        #20;
+
+        // bikaç kere double (shift left)
+        s = 3'b001; 
+        #100;
+
+        // bikaç kere half (shift right)
+        s = 3'b010;
+        #100;
+
+        $stop;
+    end
+endmodule
+
+set_property PACKAGE_PIN W5 [get_ports { clk }]
+set_property IOSTANDARD LVCMOS33 [get_ports { clk }]
+create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports { clk }]
+set_property PACKAGE_PIN V17 [get_ports { sw[0] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[0] }]
+set_property PACKAGE_PIN V16 [get_ports { sw[1] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[1] }]
+set_property PACKAGE_PIN W16 [get_ports { sw[2] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[2] }]
+set_property PACKAGE_PIN W17 [get_ports { sw[3] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[3] }]
+set_property PACKAGE_PIN W15 [get_ports { sw[4] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[4] }]
+set_property PACKAGE_PIN V15 [get_ports { sw[5] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[5] }]
+set_property PACKAGE_PIN W14 [get_ports { sw[6] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[6] }]
+set_property PACKAGE_PIN W13 [get_ports { sw[7] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[7] }]
+set_property PACKAGE_PIN V2 [get_ports { sw[8] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[8] }]
+set_property PACKAGE_PIN T3 [get_ports { sw[9] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[9] }]
+set_property PACKAGE_PIN T2 [get_ports { sw[10] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[10] }]
+set_property PACKAGE_PIN R3 [get_ports { sw[11] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[11] }]
+set_property PACKAGE_PIN W2 [get_ports { sw[12] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[12] }]
+set_property PACKAGE_PIN U1 [get_ports { sw[13] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[13] }]
+set_property PACKAGE_PIN T1 [get_ports { sw[14] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[14] }]
+set_property PACKAGE_PIN R2 [get_ports { sw[15] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { sw[15] }]
+set_property PACKAGE_PIN U16 [get_ports { led[0] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[0] }]
+set_property PACKAGE_PIN E19 [get_ports { led[1] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[1] }]
+set_property PACKAGE_PIN U19 [get_ports { led[2] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[2] }]
+set_property PACKAGE_PIN V19 [get_ports { led[3] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[3] }]
+set_property PACKAGE_PIN W18 [get_ports { led[4] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[4] }]
+set_property PACKAGE_PIN U15 [get_ports { led[5] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[5] }]
+set_property PACKAGE_PIN U14 [get_ports { led[6] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[6] }]
+set_property PACKAGE_PIN V14 [get_ports { led[7] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[7] }]
+set_property PACKAGE_PIN V13 [get_ports { led[8] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[8] }]
+set_property PACKAGE_PIN V3 [get_ports { led[9] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[9] }]
+set_property PACKAGE_PIN W3 [get_ports { led[10] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[10] }]
+set_property PACKAGE_PIN U3 [get_ports { led[11] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[11] }]
+set_property PACKAGE_PIN P3 [get_ports { led[12] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[12] }]
+set_property PACKAGE_PIN N3 [get_ports { led[13] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[13] }]
+set_property PACKAGE_PIN P1 [get_ports { led[14] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[14] }]
+set_property PACKAGE_PIN L1 [get_ports { led[15] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { led[15] }]
+set_property PACKAGE_PIN W7 [get_ports { seg[0] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[0] }]
+set_property PACKAGE_PIN W6 [get_ports { seg[1] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[1] }]
+set_property PACKAGE_PIN U8 [get_ports { seg[2] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[2] }]
+set_property PACKAGE_PIN V8 [get_ports { seg[3] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[3] }]
+set_property PACKAGE_PIN U5 [get_ports { seg[4] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[4] }]
+set_property PACKAGE_PIN V5 [get_ports { seg[5] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[5] }]
+set_property PACKAGE_PIN U7 [get_ports { seg[6] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { seg[6] }]
+set_property PACKAGE_PIN U2 [get_ports { an[0] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { an[0] }]
+set_property PACKAGE_PIN U4 [get_ports { an[1] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { an[1] }]
+set_property PACKAGE_PIN V4 [get_ports { an[2] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { an[2] }]
+set_property PACKAGE_PIN W4 [get_ports { an[3] }]
+set_property IOSTANDARD LVCMOS33 [get_ports { an[3] }]
+
+
