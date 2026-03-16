@@ -1,4 +1,4 @@
-Lab - Decoders and Multiplexers  
+# Lab - Decoders and Multiplexers  
 This folder contains the implementation of Lab 1-2 for the CS 223 Digital Design Laboratory course.
 ## Objective
 The goal of this lab is to understand and implement fundamental digital building blocks such as multiplexers and decoders using SystemVerilog.
