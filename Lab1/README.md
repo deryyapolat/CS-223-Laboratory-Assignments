@@ -5,7 +5,7 @@ The goal of this lab is to understand and implement fundamental digital building
 ## Contents
 This lab includes:
 
-3-to-1 Multiplexer design
+3-to-1 Multiplexer design /n
 4-to-1 Multiplexer design
 Implementation of logic functions using multiplexers
 2-to-4 Decoder design
