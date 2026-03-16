@@ -13,7 +13,7 @@ The codes include multiplexer, decoder, logic function, and bit shifter designs 
 - Implementation of 2-to-4 and 3-to-8 Decoders and 3-to-1, 4-to-1 and 8-to-1 Multiplexers
 
 ## Files
-Laboratory Assignment file
+Laboratory Assignment file  
 Needed preliminary file with schematics  
 SystemVerilog modules  
 Testbench files  
